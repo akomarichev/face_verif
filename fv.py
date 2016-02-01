@@ -71,16 +71,16 @@ def lrf(images1, images2, W, small_patch, patch_size, image_height, image_width,
     # z2_convolved = np.zeros((hidden_size, number_of_images), dtype=np.float64)
     number_of_patches = (image_height - patch_size + 1) * (image_width - patch_size + 1)
     hidden_size = (patch_size - small_patch + 1) ** 2
-    z3_convolved = np.zeros((hidden_size, number_of_patches, N, filters), dtype=np.float64)
+    z3_convolved = np.zeros((hidden_size, number_of_patches, filters, N), dtype=np.float64)
     for i in range(N):
         for k in range(filters):
-            patches_bigger, patches_smaller = extract_patches(images1[:, :, i, k], images2[:, :, i, k], image_height, image_width, small_patch, patch_size, number_of_patches)
+            patches_bigger, patches_smaller = extract_patches(images1[:, :, k, i], images2[:, :, k, i], image_height, image_width, small_patch, patch_size, number_of_patches)
             for t in range(number_of_patches):
                 patches = extract_patches2(patches_bigger[:, :, t], patch_size, small_patch, hidden_size)
                 for j in range(hidden_size):
-                    z3_convolved[j, t, i, k] = scipy.signal.convolve2d(patches[:, :, j] * patches_smaller[:, :, t], np.flipud(np.fliplr(W[:, :, j, t, k])), mode='valid')
+                    z3_convolved[j, t, k, i] = scipy.signal.convolve2d(patches[:, :, j] * patches_smaller[:, :, t], np.flipud(np.fliplr(W[:, :, j, t, k])), mode='valid')
     print "z3_convolved.shape (before): ", z3_convolved.shape
-    z3_convolved = z3_convolved.reshape(hidden_size * number_of_patches, N, filters)
+    z3_convolved = z3_convolved.reshape(hidden_size * number_of_patches, filters, N)
     print "z3_convolved.shape (after): ", z3_convolved.shape
     a3_convolved = rectifier(z3_convolved)
     return a3_convolved, z3_convolved
@@ -123,18 +123,19 @@ def extract_patches2(image, image_size, patch_size, number_of_patches):
 
 
 def maxout_layer(arr):
-    M, N = arr.shape[:2]
+    M = arr.shape[0]
+    N = arr.shape[2]
     print "Number of features: ", M
     print "arr.shape: ", arr.shape
 
-    maxout = np.zeros(shape=(M, N, 1))
+    maxout = np.zeros(shape=(M, 1, N))
     mask = np.zeros(shape=(arr.shape))
 
     for i in range(M):
         for j in range(N):
-            max_index = np.argmax(arr[i, j, :])
-            mask[i, j, max_index] = 1
-            maxout[i, j, 0] = arr[i, j, max_index]
+            max_index = np.argmax(arr[i, :, j])
+            mask[i, max_index, j] = 1
+            maxout[i, 0, j] = arr[i, max_index, j]
 
     return mask, maxout
 
@@ -160,13 +161,13 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # print "Original size images: ", image_height, "x", image_width
 
     # Convolution (1st layer)
-    convolved_images11 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, N, filters), dtype=np.float64)
-    convolved_images12 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, N, filters), dtype=np.float64)
+    convolved_images11 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, filters, N), dtype=np.float64)
+    convolved_images12 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, filters, N), dtype=np.float64)
 
     for i in range(filters):
         for j in range(N):
-            convolved_images11[:, :, j, i] = scipy.signal.convolve2d(images[j, 0, :, :], np.flipud(np.fliplr(W11[:, :, i])), mode='valid')
-            convolved_images12[:, :, j, i] = scipy.signal.convolve2d(images[j, 1, :, :], np.flipud(np.fliplr(W12[:, :, i])), mode='valid')
+            convolved_images11[:, :, i, j] = scipy.signal.convolve2d(images[j, 0, :, :], np.flipud(np.fliplr(W11[:, :, i])), mode='valid')
+            convolved_images12[:, :, i, j] = scipy.signal.convolve2d(images[j, 1, :, :], np.flipud(np.fliplr(W12[:, :, i])), mode='valid')
 
     z2_convolved11 = convolved_images11
     z2_convolved12 = convolved_images12
@@ -193,15 +194,15 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     mask31, maxout31 = maxout_layer(a3_convolved21)
     mask32, maxout32 = maxout_layer(a3_convolved22)
 
-    combined_maxout = np.concatenate((maxout31, maxout32), axis=2)
+    combined_maxout = np.concatenate((maxout31, maxout32), axis=1)
 
     # Maxout layer (4th layer)
 
     mask4, maxout4 = maxout_layer(combined_maxout)
     # print "maxout before: ", maxout4.shape
-    maxout4 = maxout4.reshape(dim1, dim3, N, 1)
+    maxout4 = maxout4.reshape(dim1, dim3, 1, N)
 
-    pred = np.zeros((dim3, N, 2))
+    pred = np.zeros((dim3, 2, N))
     cost = np.zeros((dim3, N))
 
     # print "(maxout4[:, i, j, 0].T).dot(W5[:, i, k]): ", (maxout4[:, 0, 0, 0].T).dot(W5[:, 0, 0])
@@ -210,13 +211,13 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     for i in range(dim3):
         for j in range(N):
             for k in range(2):
-                pred[i, j, k] = (maxout4[:, i, j, 0].T).dot(W5[:, i, k])
+                pred[i, k, j] = (maxout4[:, i, 0, j].T).dot(W5[:, i, k])
 
-    denomin = np.sum(np.exp(pred), axis=2)
+    denomin = np.sum(np.exp(pred), axis=1)
     for i in range(dim3):
         for j in range(N):
             for k in range(2):
-                pred[i, j, k] = np.exp(pred[i, j, k])/denomin[i, j]
+                pred[i, k, j] = np.exp(pred[i, k, j])/denomin[i, j]
     # pred = np.exp(pred) / np.sum(np.exp(pred), axis=2)
 
     # print "pred: ", pred
@@ -232,9 +233,9 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # Calculating cost functions for each pixel
     for i in range(N):
         if targets[i] == 0:
-            cost[:, i] = np.sum(np.log(pred[:, i, :]) * (-negative_pattern), axis=1)
+            cost[:, i] = np.sum(np.log(pred[:, :, i]) * (-negative_pattern), axis=1)
         else:
-            cost[:, i] = np.sum(np.log(pred[:, i, :]) * (-positive_pattern), axis=1)
+            cost[:, i] = np.sum(np.log(pred[:, :, i]) * (-positive_pattern), axis=1)
 
     # Backpropagation!
 
@@ -242,9 +243,9 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     diff = np.zeros(shape=(pred.shape))
     for i in range(N):
         if targets[i] == 0:
-            diff[:, i, :] = - (pred[:, i, :] - negative_pattern)
+            diff[:, :, i] = - (pred[:, :, i] - negative_pattern)
         else:
-            diff[:, i, :] = - (pred[:, i, :] - positive_pattern)
+            diff[:, :, i] = - (pred[:, :, i] - positive_pattern)
 
     # delta = np.zeros(shape=(maxout4.shape))
     # for i in range(dim3):
