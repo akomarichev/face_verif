@@ -64,7 +64,7 @@ def initialization(patch_size, small_patch, image_height, image_width, filters):
 # Local Receptive fields close to convolution but without sharing
 # parameters across different locations in the image. Our assumption that
 # stride = 1.
-# Second Layer.
+# Second Layer
 
 
 def lrf(images1, images2, W, small_patch, patch_size, image_height, image_width, filters, N):
