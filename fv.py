@@ -229,6 +229,7 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # cost = np.sum(-, axis=2)
 
     print "cost.shape: ", cost.shape
+    print "maxout4.shape: ", maxout4.shape
 
     # Calculating cost functions for each pixel
     for i in range(N):
@@ -247,16 +248,46 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
         else:
             diff[:, :, i] = - (pred[:, :, i] - positive_pattern)
 
-    # delta = np.zeros(shape=(maxout4.shape))
-    # for i in range(dim3):
-    #     for j in range(N):
-    #         for k in range(2):
-    #             if targets[j] == 0:
-    #                 delta[:, i, j, k] = - (pred[i, ] -
+    print "diff.shape: ", diff.shape
+
+    W5_d = np.zeros(shape=(W5.shape))
+    for i in range(dim3):
+        W5_d[:, i, :] = maxout4[:, i, 0, :].dot(diff[i, :, :].T)
+
+    print "W5_d.shape: ", W5_d.shape
+    print "mask4.shape: ", mask4.shape
+
+    delta5 = np.zeros(shape=(maxout4.shape))
+    for i in range(dim3):
+        for j in range(N):
+            delta5[:, i, 0, j] = W5[:, i, :].dot(diff[i, :, j].T)
 
     print "cost: ", cost
 
     print "average cost among all pixels: ", np.sum(np.sum(cost, axis=1)/N)/dim3
+
+    print "delta5: ", delta5
+    print "delta5.shape: ", delta5.shape
+
+    delta4 = np.zeros(shape=(mask4.shape))
+    delta5 = delta5.reshape(dim1 * dim3, 1, N)
+
+    # print "mask4[:, 0, :].shape: ", mask4[:, 0, :].shape
+    # print "delta5.shape: ", delta5.shape
+    # print "(delta5 * mask4[:, 0, :]).shape: " (delta5[:, 0, :] * mask4[:, 0, :]).shape
+    print "BP maxout 4!"
+    for fltr in range(2):
+        print "mask4.shape: ", mask4.shape
+        print "delta5.shape: ", delta5.shape
+        delta4[:, fltr, :] = delta5[:, 0, :] * mask4[:, fltr, :]
+    print "BP maxout 31!"
+    delta31 = np.zeros(shape=(mask31.shape))
+    for fltr in range(filters):
+        delta31[:, fltr, :] = delta4[:, 0, :] * mask31[:, fltr, :]
+    print "BP maxout 32!"
+    delta32 = np.zeros(shape=(mask32.shape))
+    for fltr in range(filters):
+        delta32[:, fltr, :] = delta4[:, 1, :] * mask32[:, fltr, :]
 
     # print "cost_sum: ", np.sum(cost, axis=2)
 
