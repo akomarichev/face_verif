@@ -79,6 +79,19 @@ def lrf(images1, images2, W, small_patch, patch_size, image_height, image_width,
     a3_convolved = rectifier(z3_convolved)
     return a3_convolved, z3_convolved
 
+# BP for lrf
+
+
+def lrf_bp(images1, images2, delta, W, small_patch, patch_size, image_height, image_width, N, dim1, dim2):
+    delta2 = np.zeros((patch_size, patch_size, dim2, N))
+    patches_bigger = np.zeros((patch_size, patch_size, dim2, N))
+    for i in range(N):
+        patches_bigger[:, :, :, i], patches_smaller = extract_patches(images1[:, :, i], images2[:, :, i], image_height, image_width, small_patch, patch_size, dim2)
+        for t in range(dim2):
+            # patches = extract_patches2(patches_bigger[:, :, t, i], patch_size, small_patch, hidden_size)
+            delta2[:, :, t, i] = scipy.signal.convolve2d(delta[:, :, t, i], np.flipud(np.fliplr(W[:, :, t] * patches_smaller[:, :, t])))
+    return delta2 * patches_bigger
+
 # a2_convolved, z2_convolved = lrf(images, W1, b1, patch_size, hidden_size, image_size)
 
 # Extracting patches from image
@@ -297,9 +310,20 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # for fltr in range(filters):
     #     delta32[:, fltr, :] = delta4[:, 1, :] * mask32[:, fltr, :]
 
-    print "delta31: ", delta31
-    print "delta32: ", delta32
+    # print "delta31: ", delta31
+    # print "delta32: ", delta32
 
+    # a3_convolved21, z3_convolved21 = lrf(a2_convolved11, a2_convolved12, W21, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
+    # a3_convolved22, z3_convolved22 = lrf(a2_convolved12, a2_convolved11, W22, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
+
+    delta31 = delta31.reshape(np.sqrt(dim1), np.sqrt(dim1), dim2, N)
+    delta32 = delta32.reshape(np.sqrt(dim1), np.sqrt(dim1), dim2, N)
+    delta21 = lrf_bp(a2_convolved11, a2_convolved12, delta31, W21, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
+    delta22 = lrf_bp(a2_convolved12, a2_convolved11, delta32, W22, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
+
+    print "delta21.shape: ", delta21.shape
+    print "delta22.shape: ", delta22.shape
+    print "delta21: ", delta21
     # delta31 = delta31 * rectifier_prime(z3_convolved21)
     # delta32 = delta32 * rectifier_prime(z3_convolved22)
 
