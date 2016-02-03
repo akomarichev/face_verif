@@ -376,6 +376,20 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
 
     delta21_combined = delta21_combined * rectifier_prime(z2_convolved11)
     delta22_combined = delta22_combined * rectifier_prime(z2_convolved12)
+
+    W11_d = np.zeros((patch_size, patch_size))
+    W12_d = np.zeros((patch_size, patch_size))
+
+    for i in range(N):
+        W11_d = W11_d + scipy.signal.convolve2d(images[j, 0, :, :], np.flipud(np.fliplr(delta21_combined[:, :, i])), mode='valid')
+        W12_d = W12_d + scipy.signal.convolve2d(images[j, 1, :, :], np.flipud(np.fliplr(delta22_combined[:, :, i])), mode='valid')
+
+    W11_d = W11_d / N
+    W12_d = W12_d / N
+
+    print "W11_d: ", W11_d
+    print "W12_d: ", W12_d
+
     # delta31 = delta31 * rectifier_prime(z3_convolved21)
     # delta32 = delta32 * rectifier_prime(z3_convolved22)
 
