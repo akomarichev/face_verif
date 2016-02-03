@@ -374,8 +374,8 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     delta21_combined = combine_all_patches_in_one_image(delta21, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
     delta22_combined = combine_all_patches_in_one_image(delta22, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
 
-    delta21_combined = delta21_combined * z2_convolved11
-    delta22_combined = delta22_combined * z2_convolved12
+    delta21_combined = delta21_combined * rectifier_prime(z2_convolved11)
+    delta22_combined = delta22_combined * rectifier_prime(z2_convolved12)
     # delta31 = delta31 * rectifier_prime(z3_convolved21)
     # delta32 = delta32 * rectifier_prime(z3_convolved22)
 
