@@ -33,7 +33,7 @@ def initialization(patch_size, small_patch, image_height, image_width, filters):
         W12[:, :, i] = np.random.random((patch_size, patch_size)) * 2 * r - r
 
     dim1 = (patch_size - small_patch + 1)**2
-    dim2 = (image_height - patch_size + 1) * (image_width - patch_size + 1)
+    dim2 = ((image_height - patch_size + 1) - patch_size + 1) * ((image_width - patch_size + 1) - patch_size + 1)
     print "Numer of parameters to tune: ", 2 * filters * patch_size**2 + 2 * filters * dim1 * dim2 * small_patch**2
 
     # weights for a upper branch (lrf layer)
@@ -48,10 +48,11 @@ def initialization(patch_size, small_patch, image_height, image_width, filters):
                 W22[:, :, i, j, k] = np.random.random(
                     (small_patch, small_patch)) * 2 * r - r
 
+    print "W21.shape: ", W21.shape
+
     # sofmax layer
-    dim3 = ((image_height - patch_size + 1) - patch_size + 1) * ((image_width - patch_size + 1) - patch_size + 1)
-    W5 = np.zeros((dim1, dim3, 2))
-    for i in range(dim3):
+    W5 = np.zeros((dim1, dim2, 2))
+    for i in range(dim2):
         for j in range(2):
             W5[:, i, j] = np.random.random((dim1)) * 2 * r - r
     print "W5.shape: ", W5.shape
@@ -75,6 +76,8 @@ def lrf(images1, images2, W, small_patch, patch_size, image_height, image_width,
     for i in range(N):
         for k in range(filters):
             patches_bigger, patches_smaller = extract_patches(images1[:, :, k, i], images2[:, :, k, i], image_height, image_width, small_patch, patch_size, number_of_patches)
+            # print "patches_bigger.shape: ", patches_bigger.shape
+            # print "number_of_patches: ", number_of_patches
             for t in range(number_of_patches):
                 patches = extract_patches2(patches_bigger[:, :, t], patch_size, small_patch, hidden_size)
                 for j in range(hidden_size):
@@ -104,7 +107,7 @@ def extract_patches(image1, image2, image_height, image_width, small_patch, patc
             patches_bigger[:, :, patchNumber] = image1[x:x + patch_size, y:y + patch_size]
             patches_smaller[:, :, patchNumber] = image2[x + delta:x + delta + small_patch, y + delta:y + delta + small_patch]
             patchNumber = patchNumber + 1
-
+    # print "patchNumber: ", patchNumber
     return patches_bigger, patches_smaller
 
 
@@ -145,15 +148,14 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     W12 = theta[filters*patch_size ** 2:2 * filters * patch_size ** 2].reshape(patch_size, patch_size, filters)
 
     dim1 = (patch_size - small_patch + 1)**2
-    dim2 = (image_height - patch_size + 1) * (image_width - patch_size + 1)
-    dim3 = ((image_height - patch_size + 1) - patch_size + 1) * ((image_width - patch_size + 1) - patch_size + 1)
+    dim2 = ((image_height - patch_size + 1) - patch_size + 1) * ((image_width - patch_size + 1) - patch_size + 1)
 
     W21 = theta[2 * filters * patch_size ** 2:2 * filters * patch_size ** 2 + filters * dim1 * dim2 * small_patch ** 2].reshape(small_patch, small_patch, dim1, dim2, filters)
     W22 = theta[2 * filters * patch_size ** 2 + filters * dim1 * dim2 * small_patch ** 2:2 * filters * patch_size ** 2 + 2 * filters * dim1 * dim2 * small_patch ** 2].reshape(small_patch, small_patch, dim1, dim2, filters)
 
     print "W21.shape: ", W21.shape
     print "W22.shape: ", W22.shape
-    W5 = theta[2 * filters * patch_size ** 2 + 2 * filters * dim1 * dim2 * small_patch ** 2:].reshape(dim1, dim3, 2)
+    W5 = theta[2 * filters * patch_size ** 2 + 2 * filters * dim1 * dim2 * small_patch ** 2:].reshape(dim1, dim2, 2)
     print "W5.shape: ", W5.shape
 
     # Feedforward
@@ -200,21 +202,21 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
 
     mask4, maxout4 = maxout_layer(combined_maxout)
     # print "maxout before: ", maxout4.shape
-    maxout4 = maxout4.reshape(dim1, dim3, 1, N)
+    maxout4 = maxout4.reshape(dim1, dim2, 1, N)
 
-    pred = np.zeros((dim3, 2, N))
-    cost = np.zeros((dim3, N))
+    pred = np.zeros((dim2, 2, N))
+    cost = np.zeros((dim2, N))
 
     # print "(maxout4[:, i, j, 0].T).dot(W5[:, i, k]): ", (maxout4[:, 0, 0, 0].T).dot(W5[:, 0, 0])
 
     # Softmax layer (5th layer):
-    for i in range(dim3):
+    for i in range(dim2):
         for j in range(N):
             for k in range(2):
                 pred[i, k, j] = (maxout4[:, i, 0, j].T).dot(W5[:, i, k])
 
     denomin = np.sum(np.exp(pred), axis=1)
-    for i in range(dim3):
+    for i in range(dim2):
         for j in range(N):
             for k in range(2):
                 pred[i, k, j] = np.exp(pred[i, k, j])/denomin[i, j]
@@ -251,26 +253,26 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     print "diff.shape: ", diff.shape
 
     W5_d = np.zeros(shape=(W5.shape))
-    for i in range(dim3):
+    for i in range(dim2):
         W5_d[:, i, :] = maxout4[:, i, 0, :].dot(diff[i, :, :].T)
 
     print "W5_d.shape: ", W5_d.shape
     print "mask4.shape: ", mask4.shape
 
     delta5 = np.zeros(shape=(maxout4.shape))
-    for i in range(dim3):
+    for i in range(dim2):
         for j in range(N):
             delta5[:, i, 0, j] = W5[:, i, :].dot(diff[i, :, j].T)
 
     print "cost: ", cost
 
-    print "average cost among all pixels: ", np.sum(np.sum(cost, axis=1)/N)/dim3
+    print "average cost among all pixels: ", np.sum(np.sum(cost, axis=1)/N)/dim2
 
     print "delta5: ", delta5
     print "delta5.shape: ", delta5.shape
 
     delta4 = np.zeros(shape=(mask4.shape))
-    delta5 = delta5.reshape(dim1 * dim3, 1, N)
+    delta5 = delta5.reshape(dim1 * dim2, 1, N)
 
     # print "mask4[:, 0, :].shape: ", mask4[:, 0, :].shape
     # print "delta5.shape: ", delta5.shape
