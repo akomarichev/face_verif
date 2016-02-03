@@ -110,7 +110,7 @@ def generate_patch_pattern(patch_size, image_height, image_width):
             elif (j > image_width - patch_size - 1):
                 y = image_width - j
             p[i, j] = x * y
-            print "x = ", x, ", y = ", y, ", i = ", i, ", j = ", j
+            # print "x = ", x, ", y = ", y, ", i = ", i, ", j = ", j
     print "p: ", p
     # # print "flipped p: ", np.flipud(np.fliplr(p))
     # # print "flipped p2: ", np.fliplr(p)
@@ -119,11 +119,20 @@ def generate_patch_pattern(patch_size, image_height, image_width):
     return p
 
 
-def collect_all_patches_in_one_image(patches, patch_size, image_height, image_width, dim2, N):
+def combine_all_patches_in_one_image(patches, patch_size, image_height, image_width, N):
     delta_combined = np.zeros((image_height, image_width, N))
     p = generate_patch_pattern(patch_size, image_height, image_width)
-    # for i in range(N):
-    #     delta
+
+    for i in range(N):
+        patchNumber = 0
+        for x in range(image_height - patch_size + 1):
+            for y in range(image_width - patch_size + 1):
+                delta_combined[x:x + patch_size, y:y + patch_size, i] = delta_combined[x:x + patch_size, y:y + patch_size, i] + patches[:, :, patchNumber, i]
+                patchNumber = patchNumber + 1
+        delta_combined[:, :, i] = delta_combined[:, :, i] / p
+
+    print "delta_combined: ", delta_combined
+    return delta_combined
 
 
 # a2_convolved, z2_convolved = lrf(images, W1, b1, patch_size, hidden_size, image_size)
@@ -362,7 +371,11 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     print "height: ", image_height - patch_size + 1
     print "width: ", image_width - patch_size + 1
 
-    collect_all_patches_in_one_image(delta21, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, dim2, N)
+    delta21_combined = combine_all_patches_in_one_image(delta21, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
+    delta22_combined = combine_all_patches_in_one_image(delta22, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
+
+    delta21_combined = delta21_combined * z2_convolved11
+    delta22_combined = delta22_combined * z2_convolved12
     # delta31 = delta31 * rectifier_prime(z3_convolved21)
     # delta32 = delta32 * rectifier_prime(z3_convolved22)
 
