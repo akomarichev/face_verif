@@ -432,7 +432,7 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # t[5] = 1
     # print "mask1[2, :][5] = 1: ", t
 
-    grad = np.concatenate((W11_d.flatten(), W12_d.flatten(), W21.flatten(), W22.flatten(), W5_d.flatten()))
+    grad = np.concatenate((W11_d.flatten(), W12_d.flatten(), W21_d.flatten(), W22_d.flatten(), W5_d.flatten()))
 
     return av_cost, grad
 
