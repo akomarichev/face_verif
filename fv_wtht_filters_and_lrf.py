@@ -2,13 +2,14 @@ from scipy import signal
 from scipy import sign
 import scipy.io
 import numpy as np
-import random
 from pylab import *
 import matplotlib.pyplot as plt
 import matplotlib
 import PIL
 import sklearn
 from sklearn.datasets import fetch_lfw_pairs
+
+np.random.seed(124)
 
 
 def rectifier(x):
@@ -506,6 +507,6 @@ def run_model():
     l_cost, l_grad = cost_and_grad(
         theta, images, targets, patch_size, small_patch, image_height, image_width, N, positive_pattern, negative_pattern)
 
-run_model()
+# run_model()
 
 # generate_random_patterns(100)

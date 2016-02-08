@@ -23,7 +23,7 @@ def compute_grad(J, theta, l_grad):
         # print "(J(theta_epsilon_plus) - J(theta_epsilon_minus)): ", (J(theta_epsilon_plus)[0] - J(theta_epsilon_minus)[0])
         # print "(J(theta_epsilon_plus) - J(theta_epsilon_minus)) / (2 * EPSILON): ", (J(theta_epsilon_plus)[0] - J(theta_epsilon_minus)[0]) / (2 * EPSILON)
         grad[i] = (J(theta_epsilon_plus)[0] - J(theta_epsilon_minus)[0]) / (2 * EPSILON)
-        if i % 5 == 0:
+        if i % 5 == 0 and i != 0:
             print "Computing gradient for input:", i
             print "Diff: ", np.linalg.norm(grad[:i] - l_grad[:i]) / np.linalg.norm(grad[:i] + l_grad[:i])
             print "l_grad[:i]: ", l_grad[:i]
