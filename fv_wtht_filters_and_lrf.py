@@ -49,7 +49,7 @@ def initialization(patch_size, small_patch, image_height, image_width):
     for i in range(dim2):
         for j in range(2):
             W5[:, i, j] = np.random.random((dim1)) * 2 * r - r
-    print "W5.shape: ", W5.shape
+    # print "W5.shape: ", W5.shape
 
     theta = np.concatenate(
         (W11.flatten(), W12.flatten(), W21.flatten(), W22.flatten(), W5.flatten()))
@@ -73,9 +73,9 @@ def lrf(images1, images2, W, small_patch, patch_size, image_height, image_width,
             patches = extract_patches2(patches_bigger[:, :, t], patch_size, patch_size, small_patch, hidden_size)
             for j in range(hidden_size):
                 z3_convolved[j, t, i] = scipy.signal.convolve2d(patches[:, :, j] * patches_smaller[:, :, t], np.flipud(np.fliplr(W[:, :, t])), mode='valid')
-    print "z3_convolved.shape (before): ", z3_convolved.shape
+    # print "z3_convolved.shape (before): ", z3_convolved.shape
     z3_convolved = z3_convolved.reshape(hidden_size * number_of_patches, N)
-    print "z3_convolved.shape (after): ", z3_convolved.shape
+    # print "z3_convolved.shape (after): ", z3_convolved.shape
     a3_convolved = rectifier(z3_convolved)
     return a3_convolved, z3_convolved
 
@@ -111,7 +111,7 @@ def generate_patch_pattern(patch_size, image_height, image_width):
                 y = image_width - j
             p[i, j] = x * y
             # print "x = ", x, ", y = ", y, ", i = ", i, ", j = ", j
-    print "p: ", p
+    # print "p: ", p
     # # print "flipped p: ", np.flipud(np.fliplr(p))
     # # print "flipped p2: ", np.fliplr(p)
     # # print "flipped p3: ", np.flipud(p)
@@ -131,7 +131,7 @@ def combine_all_patches_in_one_image(patches, patch_size, image_height, image_wi
                 patchNumber = patchNumber + 1
         delta_combined[:, :, i] = delta_combined[:, :, i] / p
 
-    print "delta_combined: ", delta_combined
+    # print "delta_combined: ", delta_combined
     return delta_combined
 
 
@@ -172,11 +172,11 @@ def extract_patches2(image, image_height, image_width, patch_size, number_of_pat
 
 
 def maxout_layer(arr):
-    print "arr.shape: ", arr.shape
+    # print "arr.shape: ", arr.shape
     M = arr.shape[0]
     N = arr.shape[2]
-    print "Number of features: ", M
-    print "arr.shape: ", arr.shape
+    # print "Number of features: ", M
+    # print "arr.shape: ", arr.shape
 
     maxout = np.zeros(shape=(M, 1, N))
     mask = np.zeros(shape=(arr.shape))
@@ -239,7 +239,7 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     a3_convolved21, z3_convolved21 = lrf(a2_convolved11, a2_convolved12, W21, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
     a3_convolved22, z3_convolved22 = lrf(a2_convolved12, a2_convolved11, W22, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
 
-    print "Done most expensive part!"
+    # print "Done most expensive part!"
     # print "After LRF (2nd layer): ", (image_height - patch_size + 1) - patch_size + 1, "x", (image_width - patch_size + 1) - patch_size + 1
     # mask31 = np.zeros(shape=(a3_convolved21.shape))
     # mask32 = np.zeros(shape=(a3_convolved21.shape))
@@ -286,8 +286,8 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
 
     # cost = np.sum(-, axis=2)
 
-    print "cost.shape: ", cost.shape
-    print "maxout4.shape: ", maxout3.shape
+    # print "cost.shape: ", cost.shape
+    # print "maxout4.shape: ", maxout3.shape
 
     # Calculating cost functions for each pixel
     for i in range(N):
@@ -306,28 +306,28 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
         else:
             diff[:, :, i] = - (pred[:, :, i] - positive_pattern)
 
-    print "diff.shape: ", diff.shape
+    # print "diff.shape: ", diff.shape
 
     W5_d = np.zeros(shape=(W5.shape))
     for i in range(dim2):
         W5_d[:, i, :] = maxout3[:, i, 0, :].dot(diff[i, :, :].T)
 
-    print "W5_d.shape: ", W5_d.shape
-    print "mask4.shape: ", mask3.shape
+    # print "W5_d.shape: ", W5_d.shape
+    # print "mask4.shape: ", mask3.shape
 
     delta5 = np.zeros(shape=(maxout3.shape))
     for i in range(dim2):
         for j in range(N):
             delta5[:, i, 0, j] = W5[:, i, :].dot(diff[i, :, j].T)
 
-    print "cost: ", cost
+    # print "cost: ", cost
 
     av_cost = np.sum(np.sum(cost, axis=1)/N)/dim2
 
-    print "average cost among all pixels: ", np.sum(np.sum(cost, axis=1)/N)/dim2
+    # print "average cost among all pixels: ", np.sum(np.sum(cost, axis=1)/N)/dim2
 
-    print "delta5: ", delta5
-    print "delta5.shape: ", delta5.shape
+    # print "delta5: ", delta5
+    # print "delta5.shape: ", delta5.shape
 
     delta3 = np.zeros(shape=(mask3.shape))
     delta5 = delta5.reshape(dim1 * dim2, 1, N)
@@ -335,10 +335,10 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # print "mask4[:, 0, :].shape: ", mask4[:, 0, :].shape
     # print "delta5.shape: ", delta5.shape
     # print "(delta5 * mask4[:, 0, :]).shape: " (delta5[:, 0, :] * mask4[:, 0, :]).shape
-    print "BP maxout 3!"
+    # print "BP maxout 3!"
     for fltr in range(2):
-        print "mask3.shape: ", mask3.shape
-        print "delta5.shape: ", delta5.shape
+        # print "mask3.shape: ", mask3.shape
+        # print "delta5.shape: ", delta5.shape
         delta3[:, fltr, :] = delta5[:, 0, :] * mask3[:, fltr, :]
 
     delta31 = np.zeros(shape=(dim1 * dim2, N))
@@ -365,12 +365,12 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     delta21 = lrf_bp(a2_convolved11, a2_convolved12, delta31, W21, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
     delta22 = lrf_bp(a2_convolved12, a2_convolved11, delta32, W22, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
 
-    print "delta21.shape: ", delta21.shape
-    print "delta22.shape: ", delta22.shape
-    # print "delta21: ", delta21
+    # print "delta21.shape: ", delta21.shape
+    # print "delta22.shape: ", delta22.shape
+    # # print "delta21: ", delta21
 
-    print "height: ", image_height - patch_size + 1
-    print "width: ", image_width - patch_size + 1
+    # print "height: ", image_height - patch_size + 1
+    # print "width: ", image_width - patch_size + 1
 
     delta21_combined = combine_all_patches_in_one_image(delta21, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
     delta22_combined = combine_all_patches_in_one_image(delta22, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
@@ -388,8 +388,8 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     W11_d = W11_d / N
     W12_d = W12_d / N
 
-    print "W11_d: ", W11_d
-    print "W12_d: ", W12_d
+    # print "W11_d: ", W11_d
+    # print "W12_d: ", W12_d
 
     W21_d = np.zeros((small_patch, small_patch, dim2))
     W22_d = np.zeros((small_patch, small_patch, dim2))
@@ -403,8 +403,8 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     W21_d = W21_d / N
     W22_d = W22_d / N
 
-    print "W21_d: ", W21_d
-    print "W22_d: ", W22_d
+    # print "W21_d: ", W21_d
+    # print "W22_d: ", W22_d
     # a2_convolved11 = rectifier(convolved_images11)
     # a2_convolved12 = rectifier(convolved_images12)
 
