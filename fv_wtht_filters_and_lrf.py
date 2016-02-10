@@ -73,7 +73,8 @@ def lrf(images1, images2, W, small_patch, patch_size, image_height, image_width,
         for t in range(number_of_patches):
             patches = extract_patches2(patches_bigger[:, :, t], patch_size, patch_size, small_patch, hidden_size)
             for j in range(hidden_size):
-                z3_convolved[j, t, i] = scipy.signal.convolve2d(patches[:, :, j] * patches_smaller[:, :, t], np.flipud(np.fliplr(W[:, :, t])), mode='valid')
+                # z3_convolved[j, t, i] = scipy.signal.convolve2d(patches[:, :, j] * patches_smaller[:, :, t], np.flipud(np.fliplr(W[:, :, t])), mode='valid')
+                z3_convolved[j, t, i] = scipy.signal.convolve2d(patches[:, :, j], np.flipud(np.fliplr(W[:, :, t])), mode='valid')
     # print "z3_convolved.shape (before): ", z3_convolved.shape
     z3_convolved = z3_convolved.reshape(hidden_size * number_of_patches, N)
     # print "z3_convolved.shape (after): ", z3_convolved.shape
@@ -90,8 +91,12 @@ def lrf_bp(images1, images2, delta, W, small_patch, patch_size, image_height, im
         patches_bigger[:, :, :, i], patches_smaller = extract_patches(images1[:, :, i], images2[:, :, i], image_height, image_width, small_patch, patch_size, dim2)
         for t in range(dim2):
             # patches = extract_patches2(patches_bigger[:, :, t, i], patch_size, small_patch, hidden_size)
-            delta2[:, :, t, i] = scipy.signal.convolve2d(delta[:, :, t, i], np.flipud(np.fliplr(W[:, :, t] * patches_smaller[:, :, t])))
-    return delta2 * patches_bigger
+            # delta2[:, :, t, i] = scipy.signal.convolve2d(delta[:, :, t, i], np.flipud(np.fliplr(W[:, :, t] * patches_smaller[:, :, t])))
+            delta2[:, :, t, i] = scipy.signal.convolve2d(W[:, :, t], delta[:, :, t, i], mode='full')
+            # delta2[:, :, t, i] = scipy.signal.convolve2d(delta[:, :, t, i], np.flipud(np.fliplr(W[:, :, t])), mode='full')  # * rectifier_prime(patches_bigger[:, :, t, i])
+            # delta2[:, :, t, i] = scipy.signal.convolve2d(np.flipud(np.fliplr(W[:, :, t])), delta[:, :, t, i], mode='full')
+            # delta2[:, :, t, i] = scipy.signal.convolve2d(delta[:, :, t, i], W[:, :, t], mode='full')
+    return delta2 * rectifier_prime(patches_bigger)
 
 
 def generate_patch_pattern(patch_size, image_height, image_width):
@@ -123,14 +128,21 @@ def generate_patch_pattern(patch_size, image_height, image_width):
 def combine_all_patches_in_one_image(patches, patch_size, image_height, image_width, N):
     delta_combined = np.zeros((image_height, image_width, N))
     p = generate_patch_pattern(patch_size, image_height, image_width)
-
+    # print "patches.shape: ", patches.shape
+    # print "delta_combined.shape: ", delta_combined.shape
+    patchNumber = 0
     for i in range(N):
-        patchNumber = 0
         for x in range(image_height - patch_size + 1):
             for y in range(image_width - patch_size + 1):
                 delta_combined[x:x + patch_size, y:y + patch_size, i] = delta_combined[x:x + patch_size, y:y + patch_size, i] + patches[:, :, patchNumber, i]
                 patchNumber = patchNumber + 1
-        delta_combined[:, :, i] = delta_combined[:, :, i] / p
+                # if patchNumber == 1:
+                #     print patches[:, :, patchNumber-1, i]
+
+        # print "patchNumber: ", patchNumber
+        patchNumber = 0
+        # print "delta_combined[:, :, i]: ", delta_combined[:, :, i]
+        # delta_combined[:, :, i] = delta_combined[:, :, i] / p
 
     # print "delta_combined: ", delta_combined
     return delta_combined
@@ -220,6 +232,8 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # Convolution (1st layer)
     convolved_images11 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, N), dtype=np.float64)
     convolved_images12 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, N), dtype=np.float64)
+    z2_convolved11 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, N), dtype=np.float64)
+    z2_convolved12 = np.zeros(shape=(image_height - patch_size + 1, image_width - patch_size + 1, N), dtype=np.float64)
 
     for j in range(N):
         convolved_images11[:, :, j] = scipy.signal.convolve2d(images[j, 0, :, :], np.flipud(np.fliplr(W11)), mode='valid')
@@ -240,6 +254,11 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     a3_convolved21, z3_convolved21 = lrf(a2_convolved11, a2_convolved12, W21, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
     a3_convolved22, z3_convolved22 = lrf(a2_convolved12, a2_convolved11, W22, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
 
+    # print "z3_convolved21.shape: ", z3_convolved21.shape
+
+    # print "a3_convolved21: ", a3_convolved21
+    # print "a3_convolved21: ", a3_convolved21
+
     # print "Done most expensive part!"
     # print "After LRF (2nd layer): ", (image_height - patch_size + 1) - patch_size + 1, "x", (image_width - patch_size + 1) - patch_size + 1
     # mask31 = np.zeros(shape=(a3_convolved21.shape))
@@ -253,6 +272,10 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     a3_convolved21_3D = a3_convolved21.reshape(dim1 * dim2, 1, N)
     a3_convolved22_3D = a3_convolved22.reshape(dim1 * dim2, 1, N)
 
+    # print "a3_convolved21_3D.shape: ", a3_convolved21_3D.shape
+
+    # print "a3_convolved21_3D: ", a3_convolved21_3D[:, 0, :]
+
     combined_maxout = np.concatenate((a3_convolved21_3D, a3_convolved22_3D), axis=1)
 
     # Maxout layer (3rd layer)
@@ -260,6 +283,9 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     mask3, maxout3 = maxout_layer(combined_maxout)
     # print "maxout before: ", maxout4.shape
     maxout3 = maxout3.reshape(dim1, dim2, 1, N)
+
+    # print "maxout sum: ", np.sum(mask3)
+    # print "mask3.shape: ", mask3.shape
 
     pred = np.zeros((dim2, 2, N))
     cost = np.zeros((dim2, N))
@@ -303,15 +329,17 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     diff = np.zeros(shape=(pred.shape))
     for i in range(N):
         if targets[i] == 0:
-            diff[:, :, i] = - (pred[:, :, i] - negative_pattern)
+            diff[:, :, i] = (pred[:, :, i] - negative_pattern)
         else:
-            diff[:, :, i] = - (pred[:, :, i] - positive_pattern)
+            diff[:, :, i] = (pred[:, :, i] - positive_pattern)
 
     # print "diff.shape: ", diff.shape
 
     W5_d = np.zeros(shape=(W5.shape))
     for i in range(dim2):
         W5_d[:, i, :] = maxout3[:, i, 0, :].dot(diff[i, :, :].T)
+
+    W5_d = W5_d/N
 
     # print "W5_d.shape: ", W5_d.shape
     # print "mask4.shape: ", mask3.shape
@@ -323,7 +351,7 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
 
     # print "cost: ", cost
 
-    av_cost = np.sum(np.sum(cost, axis=1)/N)/dim2
+    av_cost = np.sum(np.sum(cost, axis=1)/N)  # /dim2
 
     # print "average cost among all pixels: ", np.sum(np.sum(cost, axis=1)/N)/dim2
 
@@ -363,8 +391,8 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
 
     delta31 = delta31.reshape(np.sqrt(dim1), np.sqrt(dim1), dim2, N)
     delta32 = delta32.reshape(np.sqrt(dim1), np.sqrt(dim1), dim2, N)
-    delta21 = lrf_bp(a2_convolved11, a2_convolved12, delta31, W21, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
-    delta22 = lrf_bp(a2_convolved12, a2_convolved11, delta32, W22, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
+    delta21 = lrf_bp(z2_convolved11, z2_convolved12, delta31, W21, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
+    delta22 = lrf_bp(z2_convolved12, z2_convolved11, delta32, W22, small_patch, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N, dim1, dim2)
 
     # print "delta21.shape: ", delta21.shape
     # print "delta22.shape: ", delta22.shape
@@ -376,15 +404,17 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     delta21_combined = combine_all_patches_in_one_image(delta21, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
     delta22_combined = combine_all_patches_in_one_image(delta22, patch_size, image_height - patch_size + 1, image_width - patch_size + 1, N)
 
-    delta21_combined = delta21_combined * rectifier_prime(z2_convolved11)
-    delta22_combined = delta22_combined * rectifier_prime(z2_convolved12)
+    # delta21_combined = delta21_combined * rectifier_prime(z2_convolved11)
+    # delta22_combined = delta22_combined * rectifier_prime(z2_convolved12)
 
     W11_d = np.zeros((patch_size, patch_size))
     W12_d = np.zeros((patch_size, patch_size))
 
+    # print "np.flipud(np.fliplr(delta21_combined[:, :, i])).shape: ", np.flipud(np.fliplr(delta21_combined[:, :, 0])).shape
+
     for i in range(N):
-        W11_d = W11_d + scipy.signal.convolve2d(images[j, 0, :, :], np.flipud(np.fliplr(delta21_combined[:, :, i])), mode='valid')
-        W12_d = W12_d + scipy.signal.convolve2d(images[j, 1, :, :], np.flipud(np.fliplr(delta22_combined[:, :, i])), mode='valid')
+        W11_d = W11_d + scipy.signal.convolve2d(images[i, 0, :, :], np.flipud(np.fliplr(delta21_combined[:, :, i])), mode='valid')
+        W12_d = W12_d + scipy.signal.convolve2d(images[i, 1, :, :], np.flipud(np.fliplr(delta22_combined[:, :, i])), mode='valid')
 
     W11_d = W11_d / N
     W12_d = W12_d / N
@@ -434,6 +464,8 @@ def cost_and_grad(theta, images, targets, patch_size, small_patch, image_height,
     # print "mask1[2, :][5] = 1: ", t
 
     grad = np.concatenate((W11_d.flatten(), W12_d.flatten(), W21_d.flatten(), W22_d.flatten(), W5_d.flatten()))
+
+    print "grad: ", grad
 
     return av_cost, grad
 
@@ -504,9 +536,44 @@ def run_model():
 
     positive_pattern, negative_pattern = generate_random_patterns(((image_height - patch_size + 1) - patch_size + 1) * ((image_width - patch_size + 1) - patch_size + 1))
 
-    l_cost, l_grad = cost_and_grad(
-        theta, images, targets, patch_size, small_patch, image_height, image_width, N, positive_pattern, negative_pattern)
+    # l_cost, l_grad = cost_and_grad(
+    #     theta, images, targets, patch_size, small_patch, image_height, image_width, N, positive_pattern, negative_pattern)
 
-# run_model()
+    # J = lambda x: cost_and_grad(x, images, targets, patch_size, small_patch, image_height, image_width, N, positive_pattern, negative_pattern)
+    # options_ = {'maxiter': 10, 'disp': True}
+    # result = scipy.optimize.minimize(J, theta, method='L-BFGS-B', jac=True, options=options_)
+    # theta = result.x
+
+    nju = 0.00001
+    for i in range(50):
+        l_cost, l_grad = cost_and_grad(theta, images, targets, patch_size, small_patch, image_height, image_width, N, positive_pattern, negative_pattern)
+        #nju = y0*(1+y0*i)**(-3/4)
+        print "Cost: %s, iteration: %d, grad_sum: %d", (l_cost, i, np.sum(l_grad))
+        #obj_values[i, 0] = i
+        #obj_values[i, 1] = l_cost
+        theta = theta - nju*l_grad
+
+    #l_cost, l_grad = deep_autoencoder.deep_autoencoder_cost(theta, visible_size, hidden_size, nju, lambda_, images, patch_size, image_size, pooled_size, deep_autoencoder.N)
+
+    #J = lambda x: deep_autoencoder.deep_autoencoder_cost(x, visible_size, hidden_size, nju, lambda_, images, patch_size, image_size, pooled_size, deep_autoencoder.N)
+
+    #computed_grad = compute_grad(J, theta)
+    # options_ = {'maxiter': 50, 'disp': True}
+    # result = scipy.optimize.minimize(J, theta, method='L-BFGS-B', jac=True, options=options_)
+    # theta = result.x
+
+    # print np.linalg.norm(computed_grad - l_grad[:20]) /
+    # np.linalg.norm(computed_grad + l_grad[:20])
+
+    # print "computed_grad: ", compute_grad
+    # print "l_grad: ", l_grad[:20]
+
+    W1 = theta[0:patch_size * patch_size].reshape(patch_size, patch_size)
+
+    imshow(W1[:, :], cmap=cm.gray)
+
+    show()
+
+run_model()
 
 # generate_random_patterns(100)
